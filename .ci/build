@@ -1,0 +1,48 @@
+#!/bin/bash
+set -ev
+
+# Run tests
+sbt clean +test
+
+# Secure information is not available in pull requests
+if [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; then
+    # Setup gpg keys
+    gpg --keyserver keyserver.ubuntu.com --recv-keys "DC6A9A5E884B2D680E080467E107A4A6CF561C67"
+    openssl aes-256-cbc -k "$GPG_PASS" -in .ci/sec.gpg.enc -out sec.gpg -d
+    gpg --import sec.gpg
+
+    # Add plugins
+    mkdir project
+    cat <<EOF > project/ci-plugins.sbt
+    ivyLoggingLevel := UpdateLogging.Quiet
+
+    addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
+    addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "1.1")
+EOF
+
+    # Set up plugins
+    cat <<EOF > ci-build.sbt
+    ivyLoggingLevel := UpdateLogging.Quiet
+
+    pgpSigningKey in Global := Some(0xE107A4A6CF561C67l)
+    useGpgAgent in Global := true
+    useGpg in Global := true
+
+    credentials += Credentials(
+        "Sonatype Nexus Repository Manager",
+        "oss.sonatype.org",
+        "8VNUX6+2",
+        "$SONATYPE_PASS"
+    )
+EOF
+
+    # Automatic publishing for tags that start with `v<digit>`
+    if [[ "$TRAVIS_TAG" =~ ^v[0-9].* ]]; then
+	# Build and publish
+	sbt clean +publishSigned sonatypeRelease
+    else
+	# Check if signing and publishing is set up
+	sbt signedArtifacts sonatypeLogs
+    fi
+
+fi

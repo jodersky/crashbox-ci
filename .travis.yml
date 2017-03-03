@@ -1,0 +1,18 @@
+language: scala
+
+jdk:
+  - oraclejdk8 # this should be changed to openjdk as soon as it becomes available on Travis CI
+
+env:
+
+script: .ci/build
+
+cache:
+  directories:
+    - "$HOME/.ivy2/cache"
+    - "$HOME/.sbt/boot/"
+
+before_cache:
+  - find "$HOME/.ivy2/cache/io.crashbox" -depth -name "crashbox*" -exec rm -r {} \;
+  - find "$HOME/.ivy2" -name "ivydata-*.properties" -delete
+  - find "$HOME/.sbt" -name "*.lock" -delete
