@@ -5,13 +5,13 @@ scalaVersion in ThisBuild := (crossScalaVersions in ThisBuild).value.head
 scalacOptions in ThisBuild ++= Seq(
   "-deprecation",
   "-feature",
-  "-Xfatal-warnings",
+  //"-Xfatal-warnings",
   "-Xlint"
 )
 fork in ThisBuild := true
 cancelable in Global := true
 
-lazy val root = (project in file(".")).aggregate(http)
+lazy val root = (project in file(".")).aggregate(http, worker)
 
 lazy val http = (project in file("crashbox-http"))
 
