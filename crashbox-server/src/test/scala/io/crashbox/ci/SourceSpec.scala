@@ -1,5 +1,4 @@
 package io.crashbox.ci
-package source
 
 import java.io.File
 import java.nio.file.Files
@@ -9,7 +8,7 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import org.scalatest._
 
-class GitFetchersSpec extends FlatSpec with Matchers with GitFetchers {
+class SourceSpec extends FlatSpec with Matchers with Source with Core {
 
   val Timeout = 10.seconds
 
@@ -27,7 +26,7 @@ class GitFetchersSpec extends FlatSpec with Matchers with GitFetchers {
     TestUtil.withTempDir{ remote =>
       makeRepo(remote)
       TestUtil.withTempDir { local =>
-        val cloned = Await.result(fetch(remote.toURI().toURL(), local), Timeout)
+        val cloned = Await.result(fetchSource(remote.toURI().toURL(), local), Timeout)
         assert(cloned.listFiles().length == 3)
       }
     }

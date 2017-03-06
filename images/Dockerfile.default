@@ -1,0 +1,3 @@
+FROM debian:jessie-backports
+
+RUN adduser crashbox

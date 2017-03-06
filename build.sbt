@@ -11,8 +11,6 @@ scalacOptions in ThisBuild ++= Seq(
 fork in ThisBuild := true
 cancelable in Global := true
 
-lazy val root = (project in file(".")).aggregate(http, worker)
+lazy val root = (project in file(".")).aggregate(server)
 
-lazy val http = (project in file("crashbox-http"))
-
-lazy val worker = (project in file("crashbox-worker"))
+lazy val server = (project in file("crashbox-server"))
