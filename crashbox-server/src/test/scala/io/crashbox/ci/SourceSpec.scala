@@ -23,10 +23,11 @@ class SourceSpec extends FlatSpec with Matchers with Source with Core {
   }
 
   "GitFetchers" should "be able to clone a local repository" in {
-    TestUtil.withTempDir{ remote =>
+    TestUtil.withTempDir { remote =>
       makeRepo(remote)
       TestUtil.withTempDir { local =>
-        val cloned = Await.result(fetchSource(remote.toURI().toURL(), local), Timeout)
+        val cloned =
+          Await.result(fetchSource(remote.toURI().toURL(), local), Timeout)
         assert(cloned.listFiles().length == 3)
       }
     }

@@ -2,8 +2,8 @@ package io.crashbox.ci
 
 import java.net.URL
 
-
-object Main extends Core
+object Main
+    extends Core
     with Schedulers
     with Builders
     with Parsers
@@ -21,6 +21,6 @@ object Main extends Core
     )
     Thread.sleep(15000)
     System.exit(0)
-   }
+  }
 
 }
