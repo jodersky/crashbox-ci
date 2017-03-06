@@ -1,12 +1,14 @@
 package io.crashbox.ci
 
 import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}
 
 trait Core {
 
   implicit val system: ActorSystem = ActorSystem("crashbox")
+  implicit val materializer = ActorMaterializer()
   implicit val executionContext: ExecutionContext = system.dispatcher
   val blockingDispatcher: ExecutionContext =
     system.dispatchers.lookup("crashbox.blocking-dispatcher")

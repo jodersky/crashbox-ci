@@ -1,0 +1,4 @@
+#!/bin/sh
+
+curl -X POST -H "Content-Type: application/json" http://localhost:9000/api/submit \
+     -d "{\"url\": \"$1\"}"

@@ -5,8 +5,9 @@ import sbt._
 object Dependencies {
 
   val akkaActor = "com.typesafe.akka" %% "akka-actor" % "2.4.17"
-  val akkaHttpCore = "com.typesafe.akka" %% "akka-http-core" % "10.0.4"
   val akkaHttp = "com.typesafe.akka" %% "akka-http" % "10.0.4"
+  val akkaHttpCore = "com.typesafe.akka" %% "akka-http-core" % "10.0.4"
+  val akkaHttpSpray = "com.typesafe.akka" %% "akka-http-spray-json" % "10.0.0"
   val akkaStream = "com.typesafe.akka" %% "akka-stream" % "2.4.17"
 
   val jgitServer = "org.eclipse.jgit" % "org.eclipse.jgit.http.server" % "4.6.0.201612231935-r"

@@ -52,10 +52,11 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
       containerId foreach { cancelBuild(_) }
       out foreach { _.close() }
       buildDir foreach { _.delete() }
+      log.info(s"Stopped build of $url")
     }
 
     override def preStart() = {
-      log.info(s"Started build manager for $url")
+      log.info(s"Started build of $url")
       self ! Cloning(url)
     }
 
