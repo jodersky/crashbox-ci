@@ -1,4 +1,17 @@
 #!/bin/sh
 
-curl -X POST -H "Content-Type: application/json" http://localhost:9000/api/submit \
-     -d "{\"url\": \"$1\"}"
+case "$1" in
+    start)
+	shift
+	curl -i -X POST -H "Content-Type: application/json" "http://localhost:9000/api/submit" \
+	     -d "{\"url\": \"$1\"}"
+	;;
+    cancel)
+	shift
+	curl -i -X POST "http://localhost:9000/api/$1/cancel"
+	;;
+    *)
+	echo "invalid command $1" >&2
+	exit 2
+	;;
+esac

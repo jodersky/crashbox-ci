@@ -32,7 +32,7 @@ trait HttpApi { self: Core with Schedulers with StreamStore =>
   }
   import Protocol._
 
-  implicit val toResponseMarshaller: ToResponseMarshaller[Src[BuildState, Any]] =
+  implicit val toResponseMarshaller: ToResponseMarshaller[Src[String, Any]] =
     Marshaller.opaque { items =>
       val data = items.map(item => ChunkStreamPart(item.toString + "\n"))
       HttpResponse(
@@ -41,22 +41,29 @@ trait HttpApi { self: Core with Schedulers with StreamStore =>
 
   def httpApi: Route = pathPrefix(endpoint) {
     path("submit") {
-      entity(as[Request]) { req =>
-        val source = Src
-          .queue[BuildState](100, OverflowStrategy.fail)
-          .mapMaterializedValue { q =>
-            start(
-              req.buildId,
-              new URL(req.url),
-              () => saveStream(req.buildId),
-              state => q.offer(state)
-            )
-          }
-
-        complete(source)
+      post {
+        entity(as[Request]) { req =>
+          val source = Src
+            .queue[String](100, OverflowStrategy.fail)
+            .mapMaterializedValue { q =>
+              q.offer(s"Build ID: ${req.buildId}")
+              start(
+                req.buildId,
+                new URL(req.url),
+                () => saveStream(req.buildId),
+                state => q.offer(state.toString)
+              )
+            }
+          complete(source)
+        }
       }
-
-    }
+    } ~
+      path(Segment / "cancel") { buildId =>
+        post {
+          cancel(buildId)
+          complete(204 -> s"Cancelled $buildId")
+        }
+      }
   }
 
 }

@@ -119,6 +119,7 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
       out: () => OutputStream,
       update: BuildState => Unit
   ) extends SchedulerCommand
+  private case class CancelBuild(buildId: String) extends SchedulerCommand
 
   class Scheduler extends Actor {
 
@@ -135,6 +136,11 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
               s"build-${sb.buildId}")
             context watch buildManager
             runningBuilds += sb.buildId -> buildManager
+        }
+
+      case CancelBuild(id) =>
+        runningBuilds.get(id).foreach { builder =>
+          context.stop(builder)
         }
 
       case Terminated(buildManager) =>
@@ -155,6 +161,10 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
       update: BuildState => Unit
   ): Unit = {
     scheduler ! ScheduleBuild(buildId, url, out, update)
+  }
+
+  def cancel(buildId: String): Unit = {
+    scheduler ! CancelBuild(buildId)
   }
 
 }
