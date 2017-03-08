@@ -2,8 +2,10 @@ package io.crashbox.ci
 
 import java.io.File
 import java.net.URL
-import org.eclipse.jgit.api.Git
+
 import scala.concurrent.Future
+
+import org.eclipse.jgit.api.Git
 
 trait Source { self: Core =>
 

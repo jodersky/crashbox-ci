@@ -1,22 +1,20 @@
 package io.crashbox.ci
 
+import java.io.{File, OutputStream}
+
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
+import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.{
   AttachParameter,
   ListContainersParam
 }
 import com.spotify.docker.client.LogStream
 import com.spotify.docker.client.exceptions.ContainerNotFoundException
-import com.spotify.docker.client.messages.{
-  ContainerConfig,
-  HostConfig,
-  LogConfig
-}
+import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
-import java.io.{File, OutputStream}
-import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
-import com.spotify.docker.client.DefaultDockerClient
 
 trait Builders { core: Core =>
 

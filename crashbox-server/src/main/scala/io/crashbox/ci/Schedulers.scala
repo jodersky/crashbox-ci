@@ -1,26 +1,13 @@
 package io.crashbox.ci
 
-import akka.actor.{
-  Actor,
-  ActorLogging,
-  ActorRef,
-  OneForOneStrategy,
-  Props,
-  Terminated
-}
-import akka.stream.stage.GraphStageLogic
-import akka.stream.{Attributes, Outlet, SourceShape}
-import akka.stream.stage.GraphStage
 import java.io.{File, OutputStream}
 import java.net.URL
 import java.nio.file.Files
-import java.util.Base64
+
 import scala.collection.mutable.HashMap
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import akka.actor.SupervisorStrategy._
 import scala.util.{Failure, Success}
+
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 
 trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 

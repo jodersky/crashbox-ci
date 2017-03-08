@@ -1,9 +1,8 @@
 package io.crashbox.ci
 
-import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import java.net.URL
 import scala.util.{Failure, Success}
+
+import akka.http.scaladsl.Http
 
 object Main
     extends Core

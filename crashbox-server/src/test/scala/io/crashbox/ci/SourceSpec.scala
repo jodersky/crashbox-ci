@@ -1,11 +1,11 @@
 package io.crashbox.ci
 
 import java.io.File
-import java.nio.file.Files
-import java.net.URL
-import org.eclipse.jgit.api.Git
-import scala.concurrent.duration._
+
 import scala.concurrent.Await
+import scala.concurrent.duration._
+
+import org.eclipse.jgit.api.Git
 import org.scalatest._
 
 class SourceSpec extends FlatSpec with Matchers with Source with Core {

@@ -2,6 +2,7 @@ package io.crashbox.ci
 
 import java.io.File
 import java.nio.file.Files
+
 import scala.collection.JavaConverters._
 
 trait Parsers {

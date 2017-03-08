@@ -1,9 +1,10 @@
 package io.crashbox.ci
 
+import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.duration.Duration
+
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
 
 trait Core {
 
