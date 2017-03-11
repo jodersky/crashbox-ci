@@ -16,7 +16,7 @@ import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
 
-trait Builders { core: Core =>
+trait Executors { core: Core =>
 
   val dockerClient =
     DefaultDockerClient.builder().uri("unix:///run/docker.sock").build()
@@ -29,14 +29,16 @@ trait Builders { core: Core =>
   def containerWorkDirectory = "/home/crashbox"
   def containerKillTimeout = 10.seconds
 
-  case class ContainerId(id: String) {
-    override def toString = id
+  case class ExecutionId(containerId: String) {
+    override def toString = containerId
   }
 
-  def startBuild(image: String,
-                 script: String,
-                 dir: File,
-                 out: OutputStream): Future[ContainerId] =
+  def startExecution(
+      image: String,
+      script: String,
+      dir: File,
+      out: OutputStream
+  ): Future[ExecutionId] =
     Future {
       val volume = Bind
         .builder()
@@ -77,23 +79,24 @@ trait Builders { core: Core =>
           }
         }
       }
-      ContainerId(container)
+      ExecutionId(container)
     }(blockingDispatcher)
 
-  def waitBuild(id: ContainerId): Future[Int] =
+  def waitExecution(id: ExecutionId): Future[Int] =
     Future {
       log.debug(s"Waiting for container $id to exit")
-      val res: Int = dockerClient.waitContainer(id.id).statusCode()
-      cancelBuild(id)
+      val res: Int = dockerClient.waitContainer(id.containerId).statusCode()
+      cancelExecution(id)
       res
     }(blockingDispatcher)
 
-  def cancelBuild(id: ContainerId): Unit = {
-    log.debug(s"Stopping container $id")
+  def cancelExecution(id: ExecutionId): Unit = {
     try {
-      dockerClient.stopContainer(id.id,
+      log.debug(s"Stopping container $id")
+      dockerClient.stopContainer(id.containerId,
                                  containerKillTimeout.toUnit(SECONDS).toInt)
-      dockerClient.removeContainer(id.id)
+      log.debug(s"Removing container $id")
+      dockerClient.removeContainer(id.containerId)
     } catch {
       case _: ContainerNotFoundException => // build already cancelled
     }
@@ -107,7 +110,8 @@ trait Builders { core: Core =>
       )
       .asScala
     stale.foreach { container =>
-      dockerClient.removeContainer(container.id())
+      log.warning(s"Removing stale container ${container.id}")
+      dockerClient.removeContainer(container.id)
     }
   }
 

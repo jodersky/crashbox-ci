@@ -9,5 +9,7 @@ libraryDependencies ++= Seq(
   Dependencies.jgitArchive,
   Dependencies.jgitServer,
   Dependencies.dockerClient,
+  Dependencies.slick,
+  "com.h2database" % "h2" % "1.4.193",
   Dependencies.scalatest % Test
 )

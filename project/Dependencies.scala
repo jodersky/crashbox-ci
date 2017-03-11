@@ -15,6 +15,9 @@ object Dependencies {
 
   val dockerClient = "com.spotify" % "docker-client" % "8.1.1"
 
+  val slick = "com.typesafe.slick" %% "slick" % "3.2.0"
+  //"com.typesafe.slick" %% "slick-hikaricp" % "3.2.0"
+
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.1"
 
 }

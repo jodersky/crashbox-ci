@@ -1,6 +1,6 @@
 package io.crashbox.ci
 
-import java.io.{File, OutputStream}
+import java.io.File
 import java.nio.file.Files
 
 object TestUtil {

@@ -1,7 +1,7 @@
 package io.crashbox.ci
 
 import java.net.URL
-import java.security.MessageDigest
+import java.util.UUID
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.marshalling.{Marshaller, ToResponseMarshaller}
@@ -10,24 +10,27 @@ import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.Directives._
-import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Source => Src}
-import spray.json.DefaultJsonProtocol
+import akka.stream.scaladsl.StreamConverters
+import spray.json._
 
-trait HttpApi { self: Core with Schedulers with StreamStore =>
+trait HttpApi { self: Core with Schedulers with Storage =>
 
   val endpoint = "api"
 
-  case class Request(url: String) {
-    def buildId: String = {
-      val bytes = MessageDigest.getInstance("SHA-256").digest(url.getBytes)
-      bytes.map { byte =>
-        Integer.toString((byte & 0xff) + 0x100, 16)
-      }.mkString
-    }
-  }
+  case class Request(url: URL) {}
 
   object Protocol extends DefaultJsonProtocol {
+    val urlReader = new JsonReader[URL] {
+      override def read(js: JsValue) = js match {
+        case JsString(str) => new URL(str)
+        case _ => deserializationError("Expected valid url string")
+      }
+    }
+    val urlWriter = new JsonWriter[URL] {
+      override def write(url: URL) = JsString(url.toString())
+    }
+    implicit val urlFormat: JsonFormat[URL] = jsonFormat(urlReader, urlWriter)
     implicit val request = jsonFormat1(Request)
   }
   import Protocol._
@@ -43,25 +46,25 @@ trait HttpApi { self: Core with Schedulers with StreamStore =>
     path("submit") {
       post {
         entity(as[Request]) { req =>
-          val source = Src
-            .queue[String](100, OverflowStrategy.fail)
-            .mapMaterializedValue { q =>
-              q.offer(s"Build ID: ${req.buildId}")
-              start(
-                req.buildId,
-                new URL(req.url),
-                () => saveStream(req.buildId),
-                state => q.offer(state.toString)
-              )
-            }
-          complete(source)
+          val scheduled = scheduleBuild(req.url).map(_.toString())
+          complete(scheduled)
         }
       }
     } ~
       path(Segment / "cancel") { buildId =>
         post {
-          cancel(buildId)
-          complete(204 -> s"Cancelled $buildId")
+          cancelBuild(UUID.fromString(buildId))
+          complete(204 -> None)
+        }
+      } ~
+      path(Segment / "logs") { buildId =>
+        get {
+          val src = StreamConverters
+            .fromInputStream(() => readLog(UUID.fromString(buildId), 0))
+            .map { bs =>
+              bs.utf8String
+            }
+          complete(src)
         }
       }
   }

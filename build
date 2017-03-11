@@ -3,13 +3,18 @@
 case "$1" in
     start)
 	shift
-	curl -i -X POST -H "Content-Type: application/json" "http://localhost:9000/api/submit" \
+	curl -i -sS -X POST -H "Content-Type: application/json" "http://localhost:9000/api/submit" \
 	     -d "{\"url\": \"$1\"}"
 	;;
     cancel)
 	shift
-	curl -i -X POST "http://localhost:9000/api/$1/cancel"
+	curl -i -sS -X POST "http://localhost:9000/api/$1/cancel"
 	;;
+    logs)
+	shift
+	curl -i -sS -X GET "http://localhost:9000/api/$1/logs"
+	;;
+
     *)
 	echo "invalid command $1" >&2
 	exit 2

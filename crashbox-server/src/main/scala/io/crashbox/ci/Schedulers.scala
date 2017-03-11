@@ -5,11 +5,15 @@ import java.net.URL
 import java.nio.file.Files
 
 import scala.collection.mutable.HashMap
+import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
+import akka.util.Timeout
 
-trait Schedulers extends { self: Core with Source with Builders with Parsers =>
+trait Schedulers {
+  self: Core with Source with Executors with Parsers with Storage =>
 
   private def newTempDir: File =
     Files.createTempDirectory("crashbox-run").toFile()
@@ -18,25 +22,24 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
   case class Cloning(url: URL) extends BuildState
   case class Parsing(dir: File) extends BuildState
   case class Starting(dir: File, buildDef: BuildDef) extends BuildState
-  case class Running(id: ContainerId) extends BuildState
+  case class Running(id: ExecutionId) extends BuildState
 
   sealed trait EndBuildState extends BuildState
   case class Finished(status: Int) extends EndBuildState
   case class Failed(message: String) extends EndBuildState
 
   class BuildManager(
-      url: URL,
-      openOut: () => OutputStream,
-      update: BuildState => Unit
+      buildId: BuildId,
+      url: URL
   ) extends Actor
       with ActorLogging {
 
     var buildDir: Option[File] = None
     var out: Option[OutputStream] = None
-    var containerId: Option[ContainerId] = None
+    var containerId: Option[ExecutionId] = None
 
     override def postStop() = {
-      containerId foreach { cancelBuild(_) }
+      containerId foreach { cancelExecution(_) }
       out foreach { _.close() }
       buildDir foreach { _.delete() }
       log.info(s"Stopped build of $url")
@@ -51,7 +54,7 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 
       case state @ Cloning(url) =>
         log.debug("Update build state: cloning")
-        update(state)
+        updateBuildState(buildId, state)
         fetchSource(url, newTempDir) onComplete {
           case Success(dir) =>
             self ! Parsing(dir)
@@ -61,7 +64,7 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 
       case state @ Parsing(src) =>
         log.debug("Update build state: parsing")
-        update(state)
+        updateBuildState(buildId, state)
         buildDir = Some(src)
         parseBuild(src) match {
           case Left(buildDef) =>
@@ -72,10 +75,10 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 
       case state @ Starting(src, bd) =>
         log.debug("Update build state: starting")
-        update(state)
-        val so = openOut()
+        updateBuildState(buildId, state)
+        val so = saveLog(buildId, 0)
         out = Some(so)
-        startBuild(bd.image, bd.script, src, so) onComplete {
+        startExecution(bd.image, bd.script, src, so) onComplete {
           case Success(id) =>
             self ! Running(id)
           case Failure(err) =>
@@ -84,9 +87,9 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 
       case state @ Running(id) =>
         log.debug("Update build state: running")
-        update(state)
+        updateBuildState(buildId, state)
         containerId = Some(id)
-        waitBuild(id) onComplete {
+        waitExecution(id) onComplete {
           case Success(status) =>
             self ! Finished(status)
           case Failure(err) =>
@@ -95,48 +98,36 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
 
       case state @ Finished(status) =>
         log.debug("Update build state: finished")
-        update(state)
+        updateBuildState(buildId, state)
         context stop self
 
       case state @ Failed(message) =>
         log.debug("Update build state: failed")
-        update(state)
+        updateBuildState(buildId, state)
         context stop self
     }
   }
   object BuildManager {
-    def apply(buildId: String,
-              url: URL,
-              out: () => OutputStream,
-              update: BuildState => Unit) =
-      Props(new BuildManager(url, out, update))
+    def apply(buildId: BuildId, url: URL) =
+      Props(new BuildManager(buildId, url))
   }
 
   private sealed trait SchedulerCommand
-  private case class ScheduleBuild(
-      buildId: String,
-      url: URL,
-      out: () => OutputStream,
-      update: BuildState => Unit
-  ) extends SchedulerCommand
-  private case class CancelBuild(buildId: String) extends SchedulerCommand
+  private case class ScheduleBuild(url: URL) extends SchedulerCommand
+  private case class CancelBuild(buildId: BuildId) extends SchedulerCommand
 
   class Scheduler extends Actor {
-
-    val runningBuilds = new HashMap[String, ActorRef]
+    val runningBuilds = new HashMap[BuildId, ActorRef]
 
     override def receive = {
 
-      case sb: ScheduleBuild =>
-        runningBuilds.get(sb.buildId) match {
-          case Some(_) => //already running
-          case None =>
-            val buildManager = context.actorOf(
-              BuildManager(sb.buildId, sb.url, sb.out, sb.update),
-              s"build-${sb.buildId}")
-            context watch buildManager
-            runningBuilds += sb.buildId -> buildManager
-        }
+      case ScheduleBuild(url) =>
+        val buildId = newBuildId()
+        val buildManager =
+          context.actorOf(BuildManager(buildId, url), s"build-${buildId}")
+        context watch buildManager
+        runningBuilds += buildId -> buildManager
+        sender ! buildId
 
       case CancelBuild(id) =>
         runningBuilds.get(id).foreach { builder =>
@@ -154,16 +145,14 @@ trait Schedulers extends { self: Core with Source with Builders with Parsers =>
   private val scheduler =
     system.actorOf(Props(new Scheduler()), "crashbox-scheduler")
 
-  def start(
-      buildId: String,
-      url: URL,
-      out: () => OutputStream,
-      update: BuildState => Unit
-  ): Unit = {
-    scheduler ! ScheduleBuild(buildId, url, out, update)
+  // None if build can not be scheduled (queue is full)
+  def scheduleBuild(url: URL): Future[BuildId] = {
+    import akka.pattern.ask
+    implicit val timeout: Timeout = Timeout(5.seconds)
+    (scheduler ? ScheduleBuild(url)).mapTo[BuildId]
   }
 
-  def cancel(buildId: String): Unit = {
+  def cancelBuild(buildId: BuildId): Unit = {
     scheduler ! CancelBuild(buildId)
   }
 

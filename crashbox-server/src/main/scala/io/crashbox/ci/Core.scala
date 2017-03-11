@@ -4,7 +4,9 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.Duration
 
 import akka.actor.ActorSystem
+import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
+import com.typesafe.config.Config
 
 trait Core {
 
@@ -14,13 +16,13 @@ trait Core {
   val blockingDispatcher: ExecutionContext =
     system.dispatchers.lookup("crashbox.blocking-dispatcher")
 
-  def log = system.log
-  def config = system.settings.config
+  def log: LoggingAdapter = system.log
+  def config: Config = system.settings.config
 
   sys.addShutdownHook {
-    log.info("Shutting down systm")
+    log.info("Shutting down core system")
     Await.ready(system.terminate(), Duration.Inf)
-    println("shutdown")
+    log.info("System stopped")
   }
 
 }
