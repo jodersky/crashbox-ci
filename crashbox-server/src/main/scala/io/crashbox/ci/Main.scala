@@ -3,6 +3,8 @@ package io.crashbox.ci
 import scala.util.{Failure, Success}
 
 import akka.http.scaladsl.Http
+import scala.concurrent._
+import scala.concurrent.duration._
 
 object Main
     extends Core
@@ -15,6 +17,7 @@ object Main
 
   def main(args: Array[String]): Unit = {
     reapDeadBuilds()
+    Await.result(setupDatabase(), 10.seconds)
 
     val host = config.getString("crashbox.host")
     val port = config.getInt("crashbox.port")

@@ -8,18 +8,51 @@ import java.io.{
   InputStream,
   OutputStream
 }
+import scala.concurrent.Future
 import java.util.UUID
-
-import slick.driver.H2Driver.api._
+import slick.jdbc.H2Profile.api._
 
 trait Storage { self: Core with Parsers with Schedulers =>
 
   type BuildId = UUID
 
+  case class Build(
+    id: BuildId,
+    url: String,
+    rebuild: Int,
+    state: Int
+  )
 
-  
-  def newBuildId() = UUID.randomUUID()
+  class Builds(tag: Tag) extends Table[Build](tag, "builds") {
+    def id = column[BuildId]("id", O.PrimaryKey)
+    def url = column[String]("url")
+    def rebuild = column[Int]("rebuild")
+    def state = column[Int]("state")
+    def * = (id, url, rebuild, state) <> (Build.tupled, Build.unapply)
+  }
+  val builds = TableQuery[Builds]
 
+  val database = Database.forConfig("crashbox.db")
+
+  def setupDatabase(): Future[Unit] = {
+    log.info("Preparing build database")
+    val setup = DBIO.seq(
+      builds.schema.create
+    )
+    database.run(setup)
+  }
+
+  def newBuildId(): BuildId = UUID.randomUUID()
+
+  def nextBuild(url: String): Future[Build] = database.run{
+    builds.filter(_.url === url).map(_.rebuild).take(1).result.headOption
+  }.map{ no =>
+    Build(newBuildId(), url, no.getOrElse(0), 0)
+  }
+
+  def updateBuildState(buildId: BuildId, state: BuildState) = {
+    log.info(s"Build $buildId: state update $state")
+  }
 
 
   private val streamsDirectory: File = new File(
@@ -53,10 +86,6 @@ trait Storage { self: Core with Parsers with Schedulers =>
 
   def readLog(buildId: BuildId, task: Int): InputStream = {
     new FileInputStream(logFile(buildId, task))
-  }
-
-  def updateBuildState(buildId: BuildId, state: BuildState) = {
-    log.info(s"Build $buildId: state update $state")
   }
 
 }

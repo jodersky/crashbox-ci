@@ -122,12 +122,15 @@ trait Schedulers {
     override def receive = {
 
       case ScheduleBuild(url) =>
-        val buildId = newBuildId()
-        val buildManager =
-          context.actorOf(BuildManager(buildId, url), s"build-${buildId}")
-        context watch buildManager
-        runningBuilds += buildId -> buildManager
-        sender ! buildId
+        val client = sender
+        //todo handle failure
+        nextBuild(url.toString).foreach{ build =>
+          val buildManager =
+            context.actorOf(BuildManager(build.id, url), s"build-${build.id}")
+          context watch buildManager
+          runningBuilds += build.id -> buildManager
+          client ! build.id
+        }
 
       case CancelBuild(id) =>
         runningBuilds.get(id).foreach { builder =>
