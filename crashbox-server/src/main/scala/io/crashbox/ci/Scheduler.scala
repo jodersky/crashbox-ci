@@ -12,21 +12,17 @@ import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.util.Timeout
 
-trait Schedulers {
-  self: Core with Source with Executors with Parsers with Storage =>
+class Scheduler(
+  val executor: DockerExecutor,
+  storage: Storage
+)(implicit core: Core) {
+  import Scheduler._
+  import core._
+  import executor._
+  import storage._
 
   private def newTempDir: File =
     Files.createTempDirectory("crashbox-run").toFile()
-
-  sealed trait BuildState
-  case class Cloning(url: URL) extends BuildState
-  case class Parsing(dir: File) extends BuildState
-  case class Starting(dir: File, buildDef: BuildDef) extends BuildState
-  case class Running(id: ExecutionId) extends BuildState
-
-  sealed trait EndBuildState extends BuildState
-  case class Finished(status: Int) extends EndBuildState
-  case class Failed(message: String) extends EndBuildState
 
   class BuildManager(
       buildId: BuildId,
@@ -55,7 +51,7 @@ trait Schedulers {
       case state @ Cloning(url) =>
         log.debug("Update build state: cloning")
         updateBuildState(buildId, state)
-        fetchSource(url, newTempDir) onComplete {
+        Git.fetchSource(url, newTempDir) onComplete {
           case Success(dir) =>
             self ! Parsing(dir)
           case Failure(err) =>
@@ -66,7 +62,7 @@ trait Schedulers {
         log.debug("Update build state: parsing")
         updateBuildState(buildId, state)
         buildDir = Some(src)
-        parseBuild(src) match {
+        Parser.parseBuild(src) match {
           case Left(buildDef) =>
             self ! Starting(src, buildDef)
           case Right(err) =>
@@ -158,5 +154,19 @@ trait Schedulers {
   def cancelBuild(buildId: BuildId): Unit = {
     scheduler ! CancelBuild(buildId)
   }
+
+}
+
+object Scheduler {
+
+  sealed trait BuildState
+  case class Cloning(url: URL) extends BuildState
+  case class Parsing(dir: File) extends BuildState
+  case class Starting(dir: File, buildDef: BuildDef) extends BuildState
+  case class Running(id: ExecutionId) extends BuildState
+
+  sealed trait EndBuildState extends BuildState
+  case class Finished(status: Int) extends EndBuildState
+  case class Failed(message: String) extends EndBuildState
 
 }

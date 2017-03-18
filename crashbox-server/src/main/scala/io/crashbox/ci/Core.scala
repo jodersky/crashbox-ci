@@ -8,7 +8,7 @@ import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
 import com.typesafe.config.Config
 
-trait Core {
+class Core {
 
   implicit val system: ActorSystem = ActorSystem("crashbox")
   implicit val materializer = ActorMaterializer()

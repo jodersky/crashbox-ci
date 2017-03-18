@@ -5,16 +5,9 @@ import java.nio.file.Files
 
 import scala.collection.JavaConverters._
 
-trait Parsers {
+object Parser {
 
   def defaultImage = "crashbox/default"
-
-  case class BuildDef(
-      image: String,
-      script: String
-  )
-
-  case class ParseError(message: String)
 
   def parseBuild(workdir: File): Either[BuildDef, ParseError] = {
     val file = new File(workdir, ".crashbox.txt")

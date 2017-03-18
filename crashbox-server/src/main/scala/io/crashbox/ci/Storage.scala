@@ -12,9 +12,9 @@ import scala.concurrent.Future
 import java.util.UUID
 import slick.jdbc.H2Profile.api._
 
-trait Storage { self: Core with Parsers with Schedulers =>
-
-  type BuildId = UUID
+class Storage(implicit core: Core) {
+  import core._
+  import Scheduler._
 
   case class Build(
     id: BuildId,

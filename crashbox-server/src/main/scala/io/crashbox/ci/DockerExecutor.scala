@@ -16,7 +16,12 @@ import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
 
-trait Executors { core: Core =>
+case class ExecutionId(containerId: String) {
+  override def toString = containerId
+}
+
+class DockerExecutor(implicit core: Core) {
+  import core._
 
   val dockerClient =
     DefaultDockerClient.builder().uri("unix:///run/docker.sock").build()
@@ -28,10 +33,6 @@ trait Executors { core: Core =>
   def containerUser = "crashbox"
   def containerWorkDirectory = "/home/crashbox"
   def containerKillTimeout = 10.seconds
-
-  case class ExecutionId(containerId: String) {
-    override def toString = containerId
-  }
 
   def startExecution(
       image: String,

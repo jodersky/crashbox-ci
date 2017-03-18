@@ -14,7 +14,8 @@ import akka.stream.scaladsl.{Source => Src}
 import akka.stream.scaladsl.StreamConverters
 import spray.json._
 
-trait HttpApi { self: Core with Schedulers with Storage =>
+class HttpApi(scheduler: Scheduler, storage: Storage)(implicit core: Core) {
+  import core._
 
   val endpoint = "api"
 
@@ -46,21 +47,21 @@ trait HttpApi { self: Core with Schedulers with Storage =>
     path("submit") {
       post {
         entity(as[Request]) { req =>
-          val scheduled = scheduleBuild(req.url).map(_.toString())
+          val scheduled = scheduler.scheduleBuild(req.url).map(_.toString())
           complete(scheduled)
         }
       }
     } ~
       path(Segment / "cancel") { buildId =>
         post {
-          cancelBuild(UUID.fromString(buildId))
+          scheduler.cancelBuild(UUID.fromString(buildId))
           complete(204 -> None)
         }
       } ~
       path(Segment / "logs") { buildId =>
         get {
           val src = StreamConverters
-            .fromInputStream(() => readLog(UUID.fromString(buildId), 0))
+            .fromInputStream(() => storage.readLog(UUID.fromString(buildId), 0))
             .map { bs =>
               bs.utf8String
             }
