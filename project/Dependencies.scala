@@ -20,4 +20,6 @@ object Dependencies {
 
   val scalatest = "org.scalatest" %% "scalatest" % "3.0.1"
 
+  val yaml = "org.yaml" % "snakeyaml" % "1.18"
+
 }
