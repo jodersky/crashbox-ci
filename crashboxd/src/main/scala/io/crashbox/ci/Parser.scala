@@ -8,7 +8,7 @@ object Parser {
   case class Success(buildDef: BuildDef) extends Result
   case class Failure(error: String) extends Result
 
-  implicit object TaskDefReader extends YamlReader[TaskDef] {
+  implicit object TaskDefReader extends YamlReader[TaskDef[_]] {
     def read(value: YamlValue) = {
       val items = value.convertTo[Map[String, YamlValue]]
       val image = items
@@ -29,7 +29,7 @@ object Parser {
       val tasks = items
         .getOrElse("tasks",
                    throw new YamlFormatException("no tasks specified"))
-        .convertTo[Map[String, TaskDef]]
+        .convertTo[Map[String, TaskDef[_]]]
       BuildDef(tasks.values.toSeq)
     }
   }

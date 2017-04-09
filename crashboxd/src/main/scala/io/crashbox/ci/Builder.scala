@@ -19,10 +19,10 @@ case class TaskId(buildId: String, taskIdx: Int) {
   override def toString = s"$buildId#$taskIdx"
 }
 
-class BuildSource(
+class BuildSource[E <: Environment](
   taskId: TaskId,
-  taskDef: TaskDef,
-  executor: DockerExecutor,
+  taskDef: TaskDef[E],
+  executor: Executor[E],
   mkdir: => File,
   mkout: => OutputStream // TODO refactor this into a two-output stage
 ) extends GraphStage[SourceShape[Builder.BuildState]] {
@@ -36,7 +36,7 @@ class BuildSource(
     implicit def ec = materializer.executionContext
 
     lazy val instance: Future[ExecutionId] = executor.start(
-      taskDef.environment.asInstanceOf[DockerEnvironment],
+      taskDef.environment,
       taskDef.script,
       mkdir,
       mkout
@@ -85,7 +85,7 @@ object Builder {
   sealed trait BuildState {
     def taskId: TaskId
   }
-  case class TaskStarting(taskId: TaskId, taskDef: TaskDef) extends BuildState
+  case class TaskStarting(taskId: TaskId, taskDef: TaskDef[Environment]) extends BuildState
   case class TaskRunning(taskId: TaskId, execId: ExecutionId) extends BuildState
 
   case class TaskFinished(taskId: TaskId, status: Int) extends BuildState
