@@ -5,7 +5,6 @@ import akka.stream.SourceShape
 import akka.stream.stage.{ GraphStageLogic, InHandler, OutHandler, StageLogging }
 import akka.stream.{ Attributes, FanInShape2, Inlet, Outlet }
 import akka.stream.stage.{ GraphStage }
-import io.crashbox.ci.DockerExecutor.ExecutionId
 import java.io.{ File, OutputStream }
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.concurrent.TrieMap
@@ -37,7 +36,7 @@ class BuildSource(
     implicit def ec = materializer.executionContext
 
     lazy val instance: Future[ExecutionId] = executor.start(
-      taskDef.environment.asInstanceOf[DockerEnvironment].image,
+      taskDef.environment.asInstanceOf[DockerEnvironment],
       taskDef.script,
       mkdir,
       mkout

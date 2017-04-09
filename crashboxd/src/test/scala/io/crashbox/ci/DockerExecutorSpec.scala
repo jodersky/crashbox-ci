@@ -22,7 +22,7 @@ class DockerExecutorSpec
 
   import IOUtil._
 
-  val image = "crashbox"
+  val env = DockerEnvironment("crashbox")
 
   val timeout = 30.seconds
 
@@ -49,7 +49,7 @@ class DockerExecutorSpec
   def run[A](script: String)(tests: (Int, File, String) => A): A = withTemp {
     case (dir, out) =>
     
-    val awaitable = for (id <- exec.start(image, script, dir, out);
+    val awaitable = for (id <- exec.start(env, script, dir, out);
       status <- exec.result(id)) yield {
       status
     }
@@ -103,7 +103,7 @@ class DockerExecutorSpec
     withTemp { case (dir, out) =>
       val script = "while true; do sleep 1; echo sleeping; done"
 
-      val id = Await.result(exec.start(image, script, dir, out), timeout)
+      val id = Await.result(exec.start(env, script, dir, out), timeout)
       val check = exec.result(id).map { res =>
         assert(res == 137)
       }

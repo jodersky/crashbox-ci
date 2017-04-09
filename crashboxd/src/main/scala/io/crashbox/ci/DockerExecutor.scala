@@ -19,9 +19,10 @@ import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
 
+case class ExecutionId(id: String) extends AnyVal
+
 object DockerExecutor {
 
-  case class ExecutionId(id: String) extends AnyVal
 
   def containerUser = "crashbox"
   def containerWorkDirectory = "/home/crashbox"
@@ -30,7 +31,7 @@ object DockerExecutor {
 }
 
 class DockerExecutor(uri: String = "unix:///run/docker.sock")(
-    implicit system: ActorSystem) {
+    implicit system: ActorSystem) extends Executor[DockerEnvironment] {
   import DockerExecutor._
   import system.log
 
@@ -45,7 +46,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
   private val label = "crashbox-executor" -> UUID.randomUUID().toString
 
   def start(
-      image: String,
+      env: DockerEnvironment,
       script: String,
       buildDirectory: File,
       out: OutputStream
@@ -62,7 +63,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
         .labels(Map(label).asJava)
         .hostConfig(hostConfig)
         .tty(true) // combine stdout and stderr into stdout
-        .image(image)
+        .image(env.image)
         .user(containerUser)
         .workingDir(containerWorkDirectory)
         .entrypoint("/bin/sh", "-c")
