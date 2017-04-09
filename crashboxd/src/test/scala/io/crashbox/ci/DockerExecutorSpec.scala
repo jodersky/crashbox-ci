@@ -1,5 +1,6 @@
 package io.crashbox.ci
 
+import com.spotify.docker.client.DockerClient.ListContainersParam
 import java.io.{ByteArrayOutputStream, File}
 import java.nio.file.Files
 
@@ -9,6 +10,69 @@ import scala.concurrent.duration._
 
 import akka.actor.ActorSystem
 import org.scalatest._
+import scala.util.Random
+
+
+trait DockerSuite extends Suite with BeforeAndAfterAll { self =>
+
+  private val name = self.toString()
+
+  private def withTmp[A](action: File => A): A = {
+    val dir = Files.createTempDirectory("crashbox-docker-test-" + name).toFile
+    try action(dir)
+    finally dir.delete()
+  }
+
+  val baseImage = "debian:jessie-backports"
+  val dockerImage = "crashbox"
+  val dockerTimeout = 30.seconds
+  val dockerLabel = "test-" + Random.nextInt()
+
+  implicit val system = ActorSystem("crashbox-docker-test-" + name)
+  import system.dispatcher
+  val executor = new DockerExecutor {
+    override def label = dockerLabel
+  }
+
+  def buildImage(): Unit = {
+    println("Pulling base docker image for running docker tests")
+    executor.dockerClient.pull(baseImage)
+
+    withTmp { dir =>
+      println("Adapting base image for tests")
+      val modifications = s"""|FROM $baseImage
+                              |RUN adduser crashbox
+                              |USER crashbox
+                              |""".stripMargin
+      Files.write((new File(dir, "Dockerfile")).toPath, modifications.getBytes)
+      executor.dockerClient.build(dir.toPath, dockerImage)
+    }
+  }
+
+  def runningDockers: Seq[String] = {
+    val stale = executor.dockerClient
+      .listContainers(
+        ListContainersParam.withLabel("crashbox", dockerLabel)
+      ).asScala
+    stale.map(_.id())
+  }
+
+  override def beforeAll: Unit = {
+    buildImage()
+  }
+
+  override def afterAll: Unit = {
+    val running = runningDockers
+    running.foreach { id =>
+      executor.dockerClient.stopContainer(id, 0)
+      executor.dockerClient.removeContainer(id)
+    }
+    require(running.isEmpty, "Docker containers were left running after unit tests")
+    require(runningDockers.isEmpty, "Could not delete left over docker containers.")
+  }
+
+}
+
 
 class DockerExecutorSpec
     extends FlatSpec
@@ -52,13 +116,13 @@ class DockerExecutorSpec
 
   def run[A](script: String)(tests: (Int, File, String) => A): A = withTmp {
     dir =>
-      val out = new ByteArrayOutputStream(1024)
-      val awaitable = for (id <- exec.start(image, script, dir, out);
-                           status <- exec.result(id)) yield {
-        status
-      }
-      val status = Await.result(awaitable, timeout)
-      tests(status, dir, new String(out.toByteArray()).trim())
+    val out = new ByteArrayOutputStream(1024)
+    val awaitable = for (id <- exec.start(image, script, dir, out);
+      status <- exec.result(id)) yield {
+      status
+    }
+    val status = Await.result(awaitable, timeout)
+    tests(status, dir, new String(out.toByteArray()).trim())
   }
 
   "DockerExecutor" should "return expected exit codes" in {

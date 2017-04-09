@@ -53,7 +53,9 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
       }
     })
     //dockerClient.build
-  }*/
+   }*/
+
+  def label = "build"
 
   def start(
       image: String,
@@ -70,7 +72,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
       val hostConfig = HostConfig.builder().binds(volume).build()
       val containerConfig = ContainerConfig
         .builder()
-        .labels(Map("crashbox" -> "build").asJava)
+        .labels(Map("crashbox" -> label).asJava)
         .hostConfig(hostConfig)
         .tty(true) // combine stdout and stderr into stdout
         .image(image)
