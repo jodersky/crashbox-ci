@@ -3,18 +3,17 @@ package io.crashbox.ci
 import java.io.{ File, OutputStream }
 import scala.concurrent.Future
 
-
-trait Executor[E <: Environment] {
+trait Executor[Env <: Environment, Id <: ExecutionId] {
 
   def start(
-    environment: E,
+    environment: Env,
     script: String,
     buildDirectory: File,
     out: OutputStream
-  ): Future[ExecutionId]
+  ): Future[Id]
 
-  def result(id: ExecutionId): Future[Int]
+  def result(id: Id): Future[Int]
 
-  def stop(id: ExecutionId): Unit
+  def stop(id: Id): Unit
 
 }

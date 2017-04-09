@@ -19,10 +19,8 @@ import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
 
-case class ExecutionId(id: String) extends AnyVal
 
 object DockerExecutor {
-
 
   def containerUser = "crashbox"
   def containerWorkDirectory = "/home/crashbox"
@@ -31,7 +29,7 @@ object DockerExecutor {
 }
 
 class DockerExecutor(uri: String = "unix:///run/docker.sock")(
-    implicit system: ActorSystem) extends Executor[DockerEnvironment] {
+    implicit system: ActorSystem) extends Executor[DockerEnvironment, DockerExecutionId] {
   import DockerExecutor._
   import system.log
 
@@ -50,7 +48,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
       script: String,
       buildDirectory: File,
       out: OutputStream
-  ): Future[ExecutionId] =
+  ): Future[DockerExecutionId] =
     Future {
       val volume = Bind
         .builder()
@@ -91,10 +89,10 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
           }
         }
       }
-      ExecutionId(container)
+      DockerExecutionId(container)
     }(system.dispatcher)
 
-  def result(id: ExecutionId): Future[Int] =
+  def result(id: DockerExecutionId): Future[Int] =
     Future {
       log.debug(s"Waiting for container $id to exit")
       val res: Int = dockerClient.waitContainer(id.id).statusCode()
@@ -102,7 +100,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
       res
     }(system.dispatcher)
 
-  def stop(id: ExecutionId): Unit = {
+  def stop(id: DockerExecutionId): Unit = {
     try {
       log.debug(s"Stopping container $id")
       dockerClient.stopContainer(id.id,

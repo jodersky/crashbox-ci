@@ -13,16 +13,10 @@ import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
 
-case class BuildId(id: String) extends AnyVal
-
-case class TaskId(buildId: String, taskIdx: Int) {
-  override def toString = s"$buildId#$taskIdx"
-}
-
-class BuildSource[E <: Environment](
+class BuildSource[Env <: Environment, Id <: ExecutionId](
   taskId: TaskId,
-  taskDef: TaskDef[E],
-  executor: Executor[E],
+  taskDef: TaskDef[Env],
+  executor: Executor[Env, Id],
   mkdir: => File,
   mkout: => OutputStream // TODO refactor this into a two-output stage
 ) extends GraphStage[SourceShape[Builder.BuildState]] {
@@ -35,7 +29,7 @@ class BuildSource[E <: Environment](
   def createLogic(attributes: Attributes) = new GraphStageLogic(shape) with StageLogging {
     implicit def ec = materializer.executionContext
 
-    lazy val instance: Future[ExecutionId] = executor.start(
+    lazy val instance: Future[Id] = executor.start(
       taskDef.environment,
       taskDef.script,
       mkdir,
