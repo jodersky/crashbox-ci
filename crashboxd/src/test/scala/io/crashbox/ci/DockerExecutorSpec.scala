@@ -1,5 +1,6 @@
 package io.crashbox.ci
 
+import com.spotify.docker.client.DockerClient
 import com.spotify.docker.client.DockerClient.ListContainersParam
 import java.io.{ByteArrayOutputStream, File}
 import java.nio.file.Files
@@ -13,71 +14,36 @@ import org.scalatest._
 import scala.util.Random
 
 
-trait DockerSuite extends Suite with BeforeAndAfterAll { self =>
+object DockerUtil {
+  import TestUtil._
 
-  private val name = self.toString()
+  val defaultImage = "crashbox"
 
-  private def withTmp[A](action: File => A): A = {
-    val dir = Files.createTempDirectory("crashbox-docker-test-" + name).toFile
-    try action(dir)
-    finally dir.delete()
-  }
-
-  val baseImage = "debian:jessie-backports"
-  val dockerImage = "crashbox"
-  val dockerTimeout = 30.seconds
-  val dockerLabel = "test-" + Random.nextInt()
-
-  implicit val system = ActorSystem("crashbox-docker-test-" + name)
-  import system.dispatcher
-  val executor = new DockerExecutor {
-    override def label = dockerLabel
-  }
-
-  def buildImage(): Unit = {
+  def ensureImage(client: DockerClient): Unit = {
     println("Pulling base docker image for running docker tests")
-    executor.dockerClient.pull(baseImage)
+    val baseImage = "debian:jessie-backports"
+    client.pull(baseImage)
 
-    withTmp { dir =>
+    withTempFile { dir =>
       println("Adapting base image for tests")
       val modifications = s"""|FROM $baseImage
                               |RUN adduser crashbox
                               |USER crashbox
                               |""".stripMargin
       Files.write((new File(dir, "Dockerfile")).toPath, modifications.getBytes)
-      executor.dockerClient.build(dir.toPath, dockerImage)
+      client.build(dir.toPath, defaultImage)
     }
-  }
-
-  def runningDockers: Seq[String] = {
-    val stale = executor.dockerClient
-      .listContainers(
-        ListContainersParam.withLabel("crashbox", dockerLabel)
-      ).asScala
-    stale.map(_.id())
-  }
-
-  override def beforeAll: Unit = {
-    buildImage()
-  }
-
-  override def afterAll: Unit = {
-    val running = runningDockers
-    running.foreach { id =>
-      executor.dockerClient.stopContainer(id, 0)
-      executor.dockerClient.removeContainer(id)
-    }
-    require(running.isEmpty, "Docker containers were left running after unit tests")
-    require(runningDockers.isEmpty, "Could not delete left over docker containers.")
   }
 
 }
 
-
 class DockerExecutorSpec
     extends FlatSpec
     with Matchers
-    with BeforeAndAfterAll {
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach {
+
+  import TestUtil._
 
   val image = "crashbox"
 
@@ -88,33 +54,22 @@ class DockerExecutorSpec
   val exec = new DockerExecutor
 
   override def beforeAll: Unit = {
-    println("Pulling base docker image for running docker tests")
-    val base = "debian:jessie-backports"
-    exec.dockerClient.pull(base)
-
-    withTmp { dir =>
-      println("Adapting base image for tests")
-      val modifications = s"""|FROM $base
-                              |RUN adduser crashbox
-                              |USER crashbox
-                              |""".stripMargin
-      Files.write((new File(dir, "Dockerfile")).toPath, modifications.getBytes)
-      exec.dockerClient.build(dir.toPath, image)
+    sys.addShutdownHook {
+      println("------------------- fooooo")
+      exec.clean()
     }
-
+    DockerUtil.ensureImage(exec.dockerClient)
   }
 
   override def afterAll: Unit = {
     system.terminate()
   }
 
-  def withTmp[A](action: File => A): A = {
-    val dir = Files.createTempDirectory("crashbox-docker-test").toFile
-    try action(dir)
-    finally dir.delete()
+  override def afterEach: Unit = {
+    assert(exec.clean(), "Spawned containers were not removed")
   }
 
-  def run[A](script: String)(tests: (Int, File, String) => A): A = withTmp {
+  def run[A](script: String)(tests: (Int, File, String) => A): A = withTempFile {
     dir =>
     val out = new ByteArrayOutputStream(1024)
     val awaitable = for (id <- exec.start(image, script, dir, out);
@@ -167,8 +122,8 @@ class DockerExecutorSpec
     }
   }
 
-  it should "allow cancellation" in {
-    withTmp { dir =>
+  it should "allow cancellations" in {
+    withTempFile { dir =>
       val script = "while true; do sleep 1; echo sleeping; done"
       val out = new ByteArrayOutputStream(1024)
 
@@ -177,8 +132,6 @@ class DockerExecutorSpec
         assert(res == 137)
       }
       exec.stop(id)
-      //TODO check if resoruces were cleaned up properly
-
       Await.result(check, timeout)
     }
   }

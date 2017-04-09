@@ -1,6 +1,7 @@
 package io.crashbox.ci
 
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Keep
 import akka.stream.{ ClosedShape, KillSwitch }
 import akka.stream.scaladsl.{ GraphDSL, RunnableGraph, Sink, Source }
 import akka.stream.{ ActorMaterializer, FanInShape2 }
@@ -10,54 +11,47 @@ import org.scalatest._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BuildStageSpec extends FlatSpec with Matchers with DockerSuite{
+class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
+  implicit val system = ActorSystem("crashboxd-buildstage")
   implicit val materializer = ActorMaterializer()
+  val executor = new DockerExecutor
 
-  val exec = new DockerExecutor
 
-  def withTmp[A](action: (File, ByteArrayOutputStream) => A): A = {
-    val dir = Files.createTempDirectory("crashbox-build-stage-test").toFile
-    val out = new ByteArrayOutputStream(1024)
-    try action(dir, out)
-    finally dir.delete()
+  override def beforeAll(): Unit = {
+    DockerUtil.ensureImage(executor.dockerClient)
   }
 
+  override def afterAll(): Unit = {
+    assert(executor.clean(), "Spawned containers were not removed")
+    system.terminate()
+  }
+
+
   "BuildStage" should "have a test!" in {
-    withTmp{ case (dir, out) =>
-      val taskDef = TaskDef(DockerEnvironment("crashbox"), "sleep 100; exit 0")
+    TestUtil.withTempFile{ dir =>
+      TestUtil.withTempStream{ out =>
 
-      val resultSink = Sink.foreach[Builder.BuildState](x => println(x))
+        val taskDef = TaskDef(DockerEnvironment("crashbox"), "sleep 10; exit 0")
+        val resultSink = Sink.foreach[Builder.BuildState](x => println(x))
 
-      val graph = RunnableGraph.fromGraph(GraphDSL.create(resultSink) {
-        implicit b => sink =>
-        import GraphDSL.Implicits._
+        val stage = new BuildSource(
+          TaskId("build", 0),
+          taskDef,
+          executor,
+          dir,
+          out
+        )
+        val src = Source.fromGraph(stage)
 
-        val builder = b.add(new BuildStage(exec, _ => dir, _ => out))
+        //val done = src.toMat(resultSink)(Keep.right).run()
 
-        val submissions = b.add(
-          Source.repeat(TaskId("123", 2) -> taskDef))
-        val cancellations = b.add(
-          Source.tick(10.seconds, 10.seconds, TaskId("0", 0)))
-
-        val ks = b.add(KillSwitch)
-
-        submissions ~> builder.in0
-        cancellations ~> builder.in1
-
-        builder.out ~> sink
-
-        ClosedShape
-      })
-
-      graph.run()
-      Thread.sleep(30000)
-      println("terminating")
-      Await.result(system.terminate(), 60.seconds)
-      println("teminated")
-      Thread.sleep(5000)
-      println("eot")
+        //executor.start("crashbox", "sleep 10000", dir, out)
+        Thread.sleep(1000)
+        assert(executor.clean())
+        //Await.ready(done, 30.seconds)
+        println("eot")
+      }
     }
-
   }
 }

@@ -1,6 +1,7 @@
 package io.crashbox.ci
 
 import java.io.{File, OutputStream}
+import java.util.UUID
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -12,6 +13,7 @@ import com.spotify.docker.client.DockerClient.{
   AttachParameter,
   ListContainersParam
 }
+import scala.util.Random
 import com.spotify.docker.client.LogStream
 import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
@@ -40,22 +42,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
     c
   }
 
-  /*
-  def makeImage() = {
-    val returnedImageId = dockerClient.build(
-      Paths.get("docker directory"), "test", new ProgressHandler() {
-        override def progress(message: ProgressMessage) = {
-          val imageId = message.buildImageId()
-          message.buildImageId()
-          if (imageId != null) {
-            //imageIdFromMessage.set(imageId);
-          }
-      }
-    })
-    //dockerClient.build
-   }*/
-
-  def label = "build"
+  private val label = "crashbox-executor" -> UUID.randomUUID().toString
 
   def start(
       image: String,
@@ -72,7 +59,7 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
       val hostConfig = HostConfig.builder().binds(volume).build()
       val containerConfig = ContainerConfig
         .builder()
-        .labels(Map("crashbox" -> label).asJava)
+        .labels(Map(label).asJava)
         .hostConfig(hostConfig)
         .tty(true) // combine stdout and stderr into stdout
         .image(image)
@@ -126,16 +113,19 @@ class DockerExecutor(uri: String = "unix:///run/docker.sock")(
     }
   }
 
-  def reapDeadBuilds(): Unit = {
+  def clean(): Boolean = {
     val stale = dockerClient
       .listContainers(
-        ListContainersParam.withLabel("crashbox"),
-        ListContainersParam.withStatusExited()
+        ListContainersParam.withLabel(label._1, label._2)
       )
       .asScala
-    stale.foreach { container =>
-      log.warning(s"Removing stale container ${container.id}")
-      dockerClient.removeContainer(container.id)
+    stale.isEmpty || {
+      stale.foreach { container =>
+        log.warning(s"Removing stale container ${container.id}")
+        dockerClient.killContainer(container.id)
+        dockerClient.removeContainer(container.id)
+      }
+      false
     }
   }
 

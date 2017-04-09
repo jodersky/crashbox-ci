@@ -11,7 +11,7 @@ scalacOptions in ThisBuild ++= Seq(
   "-Xlint"
 )
 fork in ThisBuild := true
-cancelable in Global := true
+//cancelable in Global := true
 
 lazy val root = (project in file(".")).aggregate(server)
 
