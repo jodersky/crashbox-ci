@@ -1,15 +1,16 @@
 package io.crashbox.ci
 
-import java.io.{ File, OutputStream }
+import java.io.{File, OutputStream}
+
 import scala.concurrent.Future
 
 trait Executor[Env <: Environment, Id <: ExecutionId] {
 
   def start(
-    environment: Env,
-    script: String,
-    buildDirectory: File,
-    out: OutputStream
+      environment: Env,
+      script: String,
+      buildDirectory: File,
+      out: OutputStream
   ): Future[Id]
 
   def result(id: Id): Future[Int]

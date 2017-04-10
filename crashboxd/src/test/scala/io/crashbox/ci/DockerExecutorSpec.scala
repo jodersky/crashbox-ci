@@ -1,8 +1,6 @@
 package io.crashbox.ci
 
-import com.spotify.docker.client.DockerClient
-import com.spotify.docker.client.DockerClient.ListContainersParam
-import java.io.{ByteArrayOutputStream, File}
+import java.io.File
 import java.nio.file.Files
 
 import scala.collection.JavaConverters._
@@ -11,8 +9,6 @@ import scala.concurrent.duration._
 
 import akka.actor.ActorSystem
 import org.scalatest._
-import scala.util.Random
-
 
 class DockerExecutorSpec
     extends FlatSpec
@@ -45,13 +41,12 @@ class DockerExecutorSpec
 
   def run[A](script: String)(tests: (Int, File, String) => A): A = withTemp {
     case (dir, out) =>
-    
-    val awaitable = for (id <- exec.start(env, script, dir, out);
-      status <- exec.result(id)) yield {
-      status
-    }
-    val status = Await.result(awaitable, timeout)
-    tests(status, dir, new String(out.toByteArray()).trim())
+      val awaitable = for (id <- exec.start(env, script, dir, out);
+                           status <- exec.result(id)) yield {
+        status
+      }
+      val status = Await.result(awaitable, timeout)
+      tests(status, dir, new String(out.toByteArray()).trim())
   }
 
   "DockerExecutor" should "return expected exit codes" in {
@@ -97,15 +92,16 @@ class DockerExecutorSpec
   }
 
   it should "allow cancellations" in {
-    withTemp { case (dir, out) =>
-      val script = "while true; do sleep 1; echo sleeping; done"
+    withTemp {
+      case (dir, out) =>
+        val script = "while true; do sleep 1; echo sleeping; done"
 
-      val id = Await.result(exec.start(env, script, dir, out), timeout)
-      val check = exec.result(id).map { res =>
-        assert(res == 137)
-      }
-      exec.stop(id)
-      Await.result(check, timeout)
+        val id = Await.result(exec.start(env, script, dir, out), timeout)
+        val check = exec.result(id).map { res =>
+          assert(res == 137)
+        }
+        exec.stop(id)
+        Await.result(check, timeout)
     }
   }
 

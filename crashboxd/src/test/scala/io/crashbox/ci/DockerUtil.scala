@@ -1,7 +1,8 @@
 package io.crashbox.ci
 
+import IOUtil._
+
 object DockerUtil {
-  import IOUtil._
   import com.spotify.docker.client.DockerClient
   import java.io.File
   import java.nio.file.Files

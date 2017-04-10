@@ -13,12 +13,10 @@ import com.spotify.docker.client.DockerClient.{
   AttachParameter,
   ListContainersParam
 }
-import scala.util.Random
 import com.spotify.docker.client.LogStream
 import com.spotify.docker.client.exceptions.ContainerNotFoundException
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig}
 import com.spotify.docker.client.messages.HostConfig.Bind
-
 
 object DockerExecutor {
 
@@ -29,7 +27,8 @@ object DockerExecutor {
 }
 
 class DockerExecutor(uri: String = "unix:///run/docker.sock")(
-    implicit system: ActorSystem) extends Executor[DockerEnvironment, DockerExecutionId] {
+    implicit system: ActorSystem)
+    extends Executor[DockerEnvironment, DockerExecutionId] {
   import DockerExecutor._
   import system.log
 

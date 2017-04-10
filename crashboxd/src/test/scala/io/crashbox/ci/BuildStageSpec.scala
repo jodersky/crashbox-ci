@@ -1,18 +1,16 @@
 package io.crashbox.ci
 
+import java.io.{ByteArrayOutputStream, File, OutputStream}
+
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+
+import Builder._
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Keep
-import akka.stream.{ ClosedShape, KillSwitch }
-import akka.stream.scaladsl.{ GraphDSL, RunnableGraph, Sink, Source }
-import akka.stream.{ ActorMaterializer, FanInShape2 }
-import java.io.{ ByteArrayOutputStream, File, OutputStream }
-import java.nio.file.Files
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Keep, RunnableGraph, Sink, Source}
 import org.scalatest._
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration._
-import Builder._
-
 
 class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
@@ -23,13 +21,13 @@ class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   case class DummyEnv() extends Environment {
     val id = DummyId()
   }
-  
+
   case class DummyId() extends ExecutionId {
     import DummyId._
 
     private var _state: State = Starting
-    def state = _state.synchronized{ _state}
-    def state_=(value: State) = _state.synchronized{_state = value}
+    def state = _state.synchronized { _state }
+    def state_=(value: State) = _state.synchronized { _state = value }
 
   }
   object DummyId {
@@ -41,12 +39,15 @@ class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   class DummyExecutor(
-    startDelay: Duration = 0.seconds,
-    resultDelay: Duration = 0.seconds,
-    stopDelay: Duration = 0.seconds
+      startDelay: Duration = 0.seconds,
+      resultDelay: Duration = 0.seconds,
+      stopDelay: Duration = 0.seconds
   ) extends Executor[DummyEnv, DummyId] {
 
-    override def start(env: DummyEnv, script: String, dir: File, out: OutputStream) = Future {
+    override def start(env: DummyEnv,
+                       script: String,
+                       dir: File,
+                       out: OutputStream) = Future {
       Thread.sleep(startDelay.toMillis)
       env.id.state = DummyId.Running
       env.id
@@ -66,8 +67,8 @@ class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   def dummySource(
-    executor: DummyExecutor,
-    env: DummyEnv
+      executor: DummyExecutor,
+      env: DummyEnv
   ): Source[BuildState, NotUsed] = {
     val stage = new BuildSource(
       TaskId("dummy", 0),
@@ -108,7 +109,6 @@ class BuildStageSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
 
     Thread.sleep(delay.toMillis)
     assert(env.id.state == DummyId.Stopped)
-
 
     val expectedEvents = Seq(
       TaskStarting(taskId, taskDef),
