@@ -31,14 +31,11 @@ class DockerExecutorSpec
   val exec = new DockerExecutor
 
   override def beforeAll: Unit = {
-    sys.addShutdownHook {
-      println("------------------- fooooo")
-      exec.clean()
-    }
     DockerUtil.ensureImage(exec.dockerClient)
   }
 
   override def afterAll: Unit = {
+    exec.clean() // in case something goes wrong
     system.terminate()
   }
 
